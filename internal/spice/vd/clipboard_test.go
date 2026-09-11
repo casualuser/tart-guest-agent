@@ -64,6 +64,20 @@ func TestClipboardGrabEncoding(t *testing.T) {
 	assert.Equal(t, []uint32{vd.VD_AGENT_CLIPBOARD_IMAGE_PNG, vd.VD_AGENT_CLIPBOARD_UTF8_TEXT}, decoded.Types)
 }
 
+func TestClipboardGrab_TrailingBytesRejected(t *testing.T) {
+	// 4-byte header + 1 trailing byte (not divisible by 4)
+	malformed := []byte{0x00, 0x00, 0x00, 0x00, 0xff}
+	_, err := vd.DecodeVDAgentClipboardGrab(malformed)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not divisible by 4")
+
+	// 4-byte header + 4-byte type + 3 trailing bytes
+	malformed2 := []byte{0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0xaa, 0xbb, 0xcc}
+	_, err2 := vd.DecodeVDAgentClipboardGrab(malformed2)
+	require.Error(t, err2)
+	assert.Contains(t, err2.Error(), "not divisible by 4")
+}
+
 func TestClipboardRequestEncoding(t *testing.T) {
 	req := vd.VDAgentClipboardRequest{
 		Selection: vd.VD_AGENT_CLIPBOARD_SELECTION_CLIPBOARD,

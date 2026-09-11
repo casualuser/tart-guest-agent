@@ -18,11 +18,15 @@ func DecodeVDAgentClipboardGrab(data []byte) (*VDAgentClipboardGrab, error) {
 		return nil, io.ErrUnexpectedEOF
 	}
 
+	typesData := data[4:]
+	if len(typesData)%4 != 0 {
+		return nil, fmt.Errorf("invalid clipboard grab payload: type section length %d is not divisible by 4", len(typesData))
+	}
+
 	grab := &VDAgentClipboardGrab{
 		Selection: data[0],
 	}
 
-	typesData := data[4:]
 	numTypes := len(typesData) / 4
 	grab.Types = make([]uint32, numTypes)
 	r := bytes.NewReader(typesData)
