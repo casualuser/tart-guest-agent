@@ -379,7 +379,7 @@ func TestVDAgent_ReadMessage_OversizedPayloadRejected(t *testing.T) {
 	var buf bytes.Buffer
 	binary.Write(&buf, binary.LittleEndian, vd.VD_AGENT_PROTOCOL)
 	binary.Write(&buf, binary.LittleEndian, vd.VD_AGENT_CLIPBOARD)
-	binary.Write(&buf, binary.LittleEndian, uint32(0)) // opaque
+	binary.Write(&buf, binary.LittleEndian, uint32(0))          // opaque
 	binary.Write(&buf, binary.LittleEndian, uint32(0xffffffff)) // 4GB size
 
 	agent := &VDAgent{

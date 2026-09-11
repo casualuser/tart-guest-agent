@@ -11,12 +11,12 @@ import (
 
 // Settings encapsulates configurable user preferences for Tart Guest Agent.
 type Settings struct {
-	NotificationsEnabled   bool   `json:"notifications_enabled"`
-	ImageClipboardEnabled  bool   `json:"image_clipboard_enabled"`
-	FileTransferEnabled    bool   `json:"file_transfer_enabled"`
-	DownloadDir            string `json:"download_dir"`
-	AutoResizeEnabled      bool   `json:"auto_resize_enabled"`
-	StartupNotification    bool   `json:"startup_notification"`
+	NotificationsEnabled  bool   `json:"notifications_enabled"`
+	ImageClipboardEnabled bool   `json:"image_clipboard_enabled"`
+	FileTransferEnabled   bool   `json:"file_transfer_enabled"`
+	DownloadDir           string `json:"download_dir"`
+	AutoResizeEnabled     bool   `json:"auto_resize_enabled"`
+	StartupNotification   bool   `json:"startup_notification"`
 }
 
 var (

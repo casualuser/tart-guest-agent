@@ -263,12 +263,12 @@ func (m *Manager) HandleData(msg *vd.VDAgentFileXferData) (*vd.VDAgentFileXferSt
 				_ = os.Remove(task.targetPath)
 				delete(m.tasks, msg.ID)
 				return &vd.VDAgentFileXferStatus{
-					ID:     msg.ID,
-					Result: vd.VD_AGENT_FILE_XFER_STATUS_NOT_ENOUGH_SPACE,
-				}, false, fmt.Errorf(
-					"not enough disk space for incoming chunk (%d bytes required, %d bytes available)",
-					msg.Size, avail,
-				)
+						ID:     msg.ID,
+						Result: vd.VD_AGENT_FILE_XFER_STATUS_NOT_ENOUGH_SPACE,
+					}, false, fmt.Errorf(
+						"not enough disk space for incoming chunk (%d bytes required, %d bytes available)",
+						msg.Size, avail,
+					)
 			}
 		}
 	}
@@ -386,8 +386,11 @@ func parseMetadata(data []byte, initialSize uint64) (string, uint64, error) {
 	}
 
 	// Fallback: If no INI key-value format was used, check if it is a bare filename
-	if fileName == "" && len(str) > 0 && !strings.Contains(str, "[") {
-		fileName = strings.TrimSpace(lines[0])
+	if fileName == "" && len(str) > 0 {
+		trimmedLine := strings.TrimSpace(lines[0])
+		if !(strings.HasPrefix(trimmedLine, "[") && strings.HasSuffix(trimmedLine, "]")) {
+			fileName = trimmedLine
+		}
 	}
 
 	return fileName, fileSize, nil

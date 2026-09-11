@@ -166,3 +166,23 @@ func TestFileXferStart_BinarySizeWithNewlineByte(t *testing.T) {
 	assert.Equal(t, uint64(10), msg.FileSize)
 	assert.Equal(t, "test.txt\x00", string(msg.Data))
 }
+
+func TestFileXferStart_BinarySizeWithBracketByte(t *testing.T) {
+	// Size = 91 (0x5b), where low byte is 0x5b ('['), verifying it is not misclassified as INI
+	raw := []byte{
+		0x0a, 0x00, 0x00, 0x00, // ID = 10
+		0x5b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Size = 91 ('[')
+		'r', 'e', 'p', 'o', 'r', 't', '.', 'p', 'd', 'f', 0x00,
+	}
+
+	msg, err := vd.DecodeVDAgentFileXferStart(raw)
+	require.NoError(t, err)
+	assert.Equal(t, uint32(10), msg.ID)
+	assert.Equal(t, uint64(91), msg.FileSize)
+	assert.Equal(t, "report.pdf\x00", string(msg.Data))
+
+	// Verify roundtrip encoding
+	encoded, err := msg.Encode()
+	require.NoError(t, err)
+	assert.Equal(t, raw, encoded)
+}

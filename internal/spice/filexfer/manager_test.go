@@ -547,3 +547,49 @@ func TestHandleData_NilMessage(t *testing.T) {
 	assert.False(t, completed)
 	assert.Nil(t, status)
 }
+
+func TestFileXferManager_BinaryStart_SizeWithBracketByte(t *testing.T) {
+	tempDir := t.TempDir()
+	mgr := filexfer.NewManager()
+	mgr.SetDownloadDir(tempDir)
+	defer mgr.Close()
+
+	// 91 bytes has low byte 0x5b ('['), ensuring binary START is parsed properly
+	// and transfer completes on the 91-byte chunk without stalling for zero-length EOF.
+	rawStart := []byte{
+		0xc8, 0x00, 0x00, 0x00, // ID = 200
+		0x5b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Size = 91 ('[')
+		'b', 'r', 'a', 'c', 'k', 'e', 't', '_', 'f', 'i', 'l', 'e', '.', 't', 'x', 't', 0x00,
+	}
+
+	startMsg, err := vd.DecodeVDAgentFileXferStart(rawStart)
+	require.NoError(t, err)
+	assert.Equal(t, uint32(200), startMsg.ID)
+	assert.Equal(t, uint64(91), startMsg.FileSize)
+
+	startStatus, err := mgr.HandleStart(startMsg)
+	require.NoError(t, err)
+	assert.Equal(t, uint32(vd.VD_AGENT_FILE_XFER_STATUS_CAN_SEND_DATA), startStatus.Result)
+
+	// Send exactly 91 bytes
+	data91 := make([]byte, 91)
+	for i := range data91 {
+		data91[i] = byte('A' + (i % 26))
+	}
+
+	status, completed, err := mgr.HandleData(&vd.VDAgentFileXferData{
+		ID:   200,
+		Size: 91,
+		Data: data91,
+	})
+	require.NoError(t, err)
+	assert.True(t, completed, "transfer of advertised size must complete upon receiving final chunk")
+	require.NotNil(t, status)
+	assert.Equal(t, uint32(vd.VD_AGENT_FILE_XFER_STATUS_SUCCESS), status.Result)
+
+	savedFilePath := filepath.Join(tempDir, "bracket_file.txt")
+	assert.FileExists(t, savedFilePath)
+	content, err := os.ReadFile(savedFilePath)
+	require.NoError(t, err)
+	assert.Equal(t, data91, content)
+}

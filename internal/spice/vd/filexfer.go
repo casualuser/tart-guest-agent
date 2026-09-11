@@ -27,6 +27,36 @@ type VDAgentFileXferStart struct {
 	Data     []byte // Variable length metadata (key-value or raw filename)
 }
 
+// isTextIni checks whether the payload represents an unambiguous SPICE text-based INI metadata
+// envelope (such as "[vdagent-file-xfer]\nname=..." or "name=..."), rather than a standard binary
+// payload starting with an 8-byte uint64 file size.
+func isTextIni(data []byte) bool {
+	trimmed := bytes.TrimLeft(data, " \t\r\n")
+	if len(trimmed) == 0 {
+		return false
+	}
+	// Canonical SPICE group header
+	if bytes.HasPrefix(trimmed, []byte("[vdagent-file-xfer]")) {
+		return true
+	}
+	// Key-value metadata lines
+	if bytes.HasPrefix(trimmed, []byte("name=")) || bytes.HasPrefix(trimmed, []byte("size=")) {
+		return true
+	}
+	// General INI envelope: must start with "[", have a closing "]", a newline,
+	// contain "name=", and contain no NUL bytes in the section header line.
+	if trimmed[0] == '[' {
+		closeBracket := bytes.IndexByte(trimmed, ']')
+		newline := bytes.IndexAny(trimmed, "\r\n")
+		if closeBracket > 1 && newline > closeBracket && bytes.Contains(trimmed, []byte("name=")) {
+			if bytes.IndexByte(trimmed[:newline], 0x00) == -1 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func DecodeVDAgentFileXferStart(buf []byte) (*VDAgentFileXferStart, error) {
 	if len(buf) < 4 {
 		return nil, io.ErrUnexpectedEOF
@@ -38,13 +68,10 @@ func DecodeVDAgentFileXferStart(buf []byte) (*VDAgentFileXferStart, error) {
 	var fileSize uint64
 	data := rem
 
-	trimmed := bytes.TrimLeft(rem, " \t\r\n")
-	isTextIni := bytes.HasPrefix(trimmed, []byte("[")) || bytes.HasPrefix(trimmed, []byte("name="))
-
 	// A standard SPICE START message places an 8-byte little-endian uint64 size before the filename.
 	// We parse the binary size header when rem contains both the 8-byte size and a filename (len(rem) > 8),
-	// unless the payload explicitly begins with INI metadata ("[...]" or "name=").
-	if !isTextIni && len(rem) > 8 {
+	// unless the payload explicitly begins with an unambiguous INI metadata envelope.
+	if !isTextIni(rem) && len(rem) > 8 {
 		fileSize = binary.LittleEndian.Uint64(rem[:8])
 		data = rem[8:]
 	}
@@ -63,10 +90,7 @@ func (msg VDAgentFileXferStart) Encode() ([]byte, error) {
 		return nil, err
 	}
 
-	trimmed := bytes.TrimLeft(msg.Data, " \t\r\n")
-	isTextIni := bytes.HasPrefix(trimmed, []byte("[")) || bytes.HasPrefix(trimmed, []byte("name="))
-
-	if msg.FileSize > 0 && !isTextIni {
+	if msg.FileSize > 0 && !isTextIni(msg.Data) {
 		if err := binary.Write(buffer, binary.LittleEndian, msg.FileSize); err != nil {
 			return nil, err
 		}

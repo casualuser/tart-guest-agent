@@ -10,4 +10,3 @@ import (
 func Listen(port uint32) (net.Listener, error) {
 	return nil, fmt.Errorf("AF_VSOCK is not supported on Windows")
 }
-
